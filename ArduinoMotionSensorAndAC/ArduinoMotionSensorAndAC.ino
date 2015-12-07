@@ -16,6 +16,8 @@
 #define UUID "97845dr2-mega-431d-adb2-eb6b9e346018"
 #define CIB_SENSORS "context.ambient.sensors" 
 #define AC_ACTUATOR "control.ambient.ac.yang"
+//motion sensor
+#define MOTION_SENSOR "control.ambient.motion.sensor"
 
 #define ERROR_MESSAGE -1
 #define BEACON_MESSAGE 0
@@ -23,6 +25,8 @@
 #define GET_RESPONSE_MESSAGE 2
 #define SET_REQUEST_MESSAGE 3
 #define SET_RESPONSE_MESSAGE 4
+//motion sensor
+#define GET_MOTION_DATA 5
 
 #define TOKEN1 "MessageType"
 #define TOKEN2 "UUID"
@@ -34,7 +38,7 @@
 #define TOKEN8 "APPID"
 
 #define MOTIONSENSOR 11
-#define TEMGENTE 13
+#define TEMGENTE 12
 
 
 IRsend irsend;
@@ -57,12 +61,13 @@ int yang_ac(int value);
 
 String setAC(String command);
 
-void blinkingLED();
-void sendBeacon();
-String getListSensors();
+void blinkingLED(); // pisca o led ao transmitir pelo infravermelho
+void sendBeacon(); 
+String getListSensointrs();
 String encoding(int messageType, String uuid, int timeout, String cib, double precision, String data, unsigned long timestamp, String appid);
 Message decoding(String json);
 void interpreter(String json);
+void getMotionData();
 
 int statusMotionSensor;
 
@@ -97,19 +102,7 @@ void loop() {
     interpreter(str);
   }
   
-  // to get motion sensor
-  statusMotionSensor = digitalRead(MOTIONSENSOR); //Le o valor do sensor PIR
- if (statusMotionSensor == LOW)  //Sem movimento, mantem led azul ligado
- {
-    digitalWrite(TEMGENTE, LOW);
-    Serial.println("no one");
- }
- else  //Caso seja detectado um movimento, aciona o led vermelho
- {
-    digitalWrite(TEMGENTE, HIGH);
-    Serial.println("moviment detected");
- }  
- 
+  getMotionData(); 
 }
 
 void interpreter(String json) {
@@ -118,7 +111,7 @@ void interpreter(String json) {
   
   switch(msg.messageType){ 
   case GET_REQUEST_MESSAGE:
-    if (String(msg.cib) == CIB_SENSORS) {
+    if (String(msg.cib) == CIB_SENSORS) { // recebe mensagem pelo bluetooth ?
       response = encoding(GET_RESPONSE_MESSAGE, UUID, TIME, msg.cib, 1.0, getListSensors(), millis(), msg.appid); 
     }
     else {
@@ -129,9 +122,19 @@ void interpreter(String json) {
   case SET_REQUEST_MESSAGE: 
     if (String(msg.cib) == AC_ACTUATOR) {
       String command = String(msg.data);
-      String data = setAC(command);
+      String data = setAC(command); // envia comando pelo IR ?
       response = encoding(SET_RESPONSE_MESSAGE, UUID, TIME, msg.cib, 1.0, data, millis(), msg.appid);
     } else {
+      response = encoding(ERROR_MESSAGE, UUID, -1, "", -1.0, "Failure interpreter!", millis(), "");
+    }
+    break;
+    
+    //motion sensor
+  case GET_MOTION_DATA: 
+    if (String(msg.cib) == MOTION_SENSOR) {
+      response = encoding(GET_RESPONSE_MESSAGE, UUID, TIME, msg.cib, 1.0,String(statusMotionSensor) , millis(), msg.appid);      
+    }
+    else {
       response = encoding(ERROR_MESSAGE, UUID, -1, "", -1.0, "Failure interpreter!", millis(), "");
     }
     break;
@@ -182,7 +185,7 @@ Message decoding(String json) {
     msg.precision = -1.0;
     msg.data = "Parse object failed!";
     msg.timestamp = 0;
-    msg.appid = "";   
+    msg.appid = "";
     return msg;
   }
 
@@ -193,7 +196,7 @@ Message decoding(String json) {
   msg.precision = object[TOKEN5];
   msg.data = object[TOKEN6];  
   msg.timestamp = object[TOKEN7];   
-  msg.appid = object[TOKEN8];                        
+  msg.appid = object[TOKEN8];
   return msg;
 }
 
@@ -317,3 +320,19 @@ void blinkingLED() {
   digitalWrite(LED_PIN, LOW);
   delay(50);
 }
+
+void getMotionData(){
+  // to get motion sensor
+  statusMotionSensor = digitalRead(MOTIONSENSOR); //Le o valor do sensor PIR
+  //digitalWrite(TEMGENTE, HIGH);
+ if (statusMotionSensor == LOW)  //Sem movimento, mantem led azul ligado
+ {
+    digitalWrite(TEMGENTE, LOW);
+    Serial.println("no one");
+ }
+ else  //Caso seja detectado um movimento, aciona o led vermelho
+ {
+    digitalWrite(TEMGENTE, HIGH);
+    Serial.println("moviment detected");
+ }
+} 
