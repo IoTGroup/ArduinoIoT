@@ -25,8 +25,6 @@
 #define GET_RESPONSE_MESSAGE 2
 #define SET_REQUEST_MESSAGE 3
 #define SET_RESPONSE_MESSAGE 4
-//motion sensor
-#define GET_MOTION_DATA 5
 
 #define TOKEN1 "MessageType"
 #define TOKEN2 "UUID"
@@ -67,7 +65,7 @@ String getListSensointrs();
 String encoding(int messageType, String uuid, int timeout, String cib, double precision, String data, unsigned long timestamp, String appid);
 Message decoding(String json);
 void interpreter(String json);
-void getMotionData();
+int getMotionData();
 
 int statusMotionSensor;
 
@@ -97,22 +95,28 @@ void loop() {
   } 
  
   if (Serial1.available() > 0) {
+    // serial 1 utilizada pelo bluetooth
     String str = Serial1.readString();    
     Serial.println(str);
     interpreter(str);
   }
   
-  getMotionData(); 
+  //getMotionData(); 
 }
 
+// recebe do Loccam
 void interpreter(String json) {
   String response = "";
   Message msg = decoding(json);
   
   switch(msg.messageType){ 
   case GET_REQUEST_MESSAGE:
-    if (String(msg.cib) == CIB_SENSORS) { // recebe mensagem pelo bluetooth ?
+    if (String(msg.cib) == CIB_SENSORS) { // sensores
       response = encoding(GET_RESPONSE_MESSAGE, UUID, TIME, msg.cib, 1.0, getListSensors(), millis(), msg.appid); 
+    }
+    else if (String(msg.cib) == MOTION_SENSOR){
+      // MOTION SENSOR
+      response = encoding(GET_RESPONSE_MESSAGE, UUID, TIME, msg.cib, 1.0,String(getMotionData()) , millis(), msg.appid); 
     }
     else {
       response = encoding(ERROR_MESSAGE, UUID, -1, "", -1.0, "Failure interpreter!", millis(), "");
@@ -120,21 +124,11 @@ void interpreter(String json) {
     break;
     
   case SET_REQUEST_MESSAGE: 
-    if (String(msg.cib) == AC_ACTUATOR) {
+    if (String(msg.cib) == AC_ACTUATOR) { // atuadores
       String command = String(msg.data);
-      String data = setAC(command); // envia comando pelo IR ?
+      String data = setAC(command); 
       response = encoding(SET_RESPONSE_MESSAGE, UUID, TIME, msg.cib, 1.0, data, millis(), msg.appid);
     } else {
-      response = encoding(ERROR_MESSAGE, UUID, -1, "", -1.0, "Failure interpreter!", millis(), "");
-    }
-    break;
-    
-    //motion sensor
-  case GET_MOTION_DATA: 
-    if (String(msg.cib) == MOTION_SENSOR) {
-      response = encoding(GET_RESPONSE_MESSAGE, UUID, TIME, msg.cib, 1.0,String(statusMotionSensor) , millis(), msg.appid);      
-    }
-    else {
       response = encoding(ERROR_MESSAGE, UUID, -1, "", -1.0, "Failure interpreter!", millis(), "");
     }
     break;
@@ -203,6 +197,8 @@ Message decoding(String json) {
 String getListSensors() {
   String str = "";
   str += AC_ACTUATOR;
+  str += ",";
+  str += MOTION_SENSOR;
   return str;
 }
 
@@ -321,9 +317,9 @@ void blinkingLED() {
   delay(50);
 }
 
-void getMotionData(){
+int getMotionData(){
   // to get motion sensor
-  statusMotionSensor = digitalRead(MOTIONSENSOR); //Le o valor do sensor PIR
+  int statusMotionSensor = digitalRead(MOTIONSENSOR); //Le o valor do sensor PIR
   //digitalWrite(TEMGENTE, HIGH);
  if (statusMotionSensor == LOW)  //Sem movimento, mantem led azul ligado
  {
@@ -335,4 +331,6 @@ void getMotionData(){
     digitalWrite(TEMGENTE, HIGH);
     Serial.println("moviment detected");
  }
+ 
+ return statusMotionSensor;
 } 
